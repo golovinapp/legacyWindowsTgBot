@@ -40,12 +40,13 @@
 2. Установите зависимости:
 
    ```bash
-  pip install -r requirements.txt
+   pip install -r requirements.txt
 
 3. Запустите бота (требуются права администратора для корректной работы команд):
 
   ```bash
   python bot_main.py
+
 
 ## Примечания
 

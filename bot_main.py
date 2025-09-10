@@ -13,6 +13,7 @@ from vpn_connections import get_vpn_sessions, reset_vpn_session
 from server_control import reboot_server, restart_vpn_service
 from network_check import check_speedtest, check_network_status, check_custom_connection
 from user_management import get_users, block_user, unblock_user, get_user_info, change_user_password
+from backup_monitoring import get_backup_status, get_backup_versions, start_manual_backup, check_backup_disk_space
 
 # Загружаем переменные из .env файла
 load_dotenv()
@@ -68,10 +69,11 @@ def start(update: telegram.Update, context: CallbackContext):
         [telegram.KeyboardButton("Управление сервером")],
         [telegram.KeyboardButton("VPN соединения")],
         [telegram.KeyboardButton("Загрузка сервера")],
-        [telegram.KeyboardButton("Проверка связи")]
+        [telegram.KeyboardButton("Проверка связи")],
+        [telegram.KeyboardButton("Резервные копии")]
     ]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-    update.message.reply_text("Привет! Я помогу управлять сеансами, мониторить сервер и VPN. Выбери действие:", reply_markup=reply_markup)
+    update.message.reply_text("Привет! Я помогу управлять сеансами, мониторить сервер, VPN и резервные копии. Выбери действие:", reply_markup=reply_markup)
 
 def handle_message(update: telegram.Update, context: CallbackContext):
     if not is_authorized(update):
@@ -89,6 +91,8 @@ def handle_message(update: telegram.Update, context: CallbackContext):
         show_server_control_menu(update, context)
     elif text == "Проверка связи":
         show_network_menu(update, context)
+    elif text == "Резервные копии":
+        show_backup_menu(update, context)
     elif text == "Список пользователей":
         show_users_list(update, context)
     elif text == "Перезагрузка сервера":
@@ -102,11 +106,205 @@ def handle_message(update: telegram.Update, context: CallbackContext):
     elif text == "Проверить связь до узла":
         update.message.reply_text("Введите IP или доменное имя:")
         return CHECK_HOST
+    elif text == "Статус резервных копий":
+        do_show_backup_status(update, context)
+    elif text == "Список версий копий":
+        do_show_backup_versions(update, context)
+    elif text == "Место на дисках":
+        do_check_backup_disk_space(update, context)
     elif text == "Назад":
         start(update, context)
     else:
         update.message.reply_text("Неизвестная команда.")
     return ConversationHandler.END
+
+# ============== НОВЫЕ ФУНКЦИИ ДЛЯ РЕЗЕРВНОГО КОПИРОВАНИЯ ==============
+
+def show_backup_menu(update: telegram.Update, context: CallbackContext):
+    """Показывает меню управления резервными копиями"""
+    keyboard = [
+        [telegram.KeyboardButton("Статус резервных копий")],
+        [telegram.KeyboardButton("Список версий копий")],
+        [telegram.KeyboardButton("Место на дисках")],
+        [telegram.KeyboardButton("Назад")]
+    ]
+    reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+    update.message.reply_text("📁 Управление резервными копиями:", reply_markup=reply_markup)
+
+def do_show_backup_status(update: telegram.Update, context: CallbackContext):
+    """Показывает статус резервных копий с дополнительными действиями"""
+    update.message.reply_text("⏳ Проверяю статус резервных копий...")
+    status_info = get_backup_status()
+    
+    # Создаем inline кнопки для дополнительных действий
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить статус", callback_data="refresh_backup_status")],
+        [telegram.InlineKeyboardButton("📋 Детали", callback_data="backup_details")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    update.message.reply_text(status_info, reply_markup=reply_markup)
+
+def do_show_backup_versions(update: telegram.Update, context: CallbackContext):
+    """Показывает список версий резервных копий"""
+    update.message.reply_text("⏳ Получаю список версий копий...")
+    versions_info = get_backup_versions()
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить список", callback_data="refresh_backup_versions")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    update.message.reply_text(versions_info, reply_markup=reply_markup)
+
+def do_check_backup_disk_space(update: telegram.Update, context: CallbackContext):
+    """Проверяет место на дисках для резервных копий"""
+    update.message.reply_text("⏳ Проверяю место на дисках...")
+    disk_info = check_backup_disk_space()
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить информацию", callback_data="refresh_disk_space")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    update.message.reply_text(disk_info, reply_markup=reply_markup)
+
+# ============== ОБРАБОТЧИКИ CALLBACK ДЛЯ РЕЗЕРВНОГО КОПИРОВАНИЯ ==============
+
+def handle_refresh_backup_status(update: telegram.Update, context: CallbackContext):
+    """Обновляет статус резервных копий"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer("🔄 Обновляю статус...")
+    
+    status_info = get_backup_status()
+    
+    # Убрали кнопку "Ручной запуск"
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить статус", callback_data="refresh_backup_status")],
+        [telegram.InlineKeyboardButton("📋 Детали", callback_data="backup_details")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    query.edit_message_text(status_info, reply_markup=reply_markup)
+
+def handle_manual_backup(update: telegram.Update, context: CallbackContext):
+    """Обрабатывает запрос ручного запуска резервного копирования"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer()
+    
+    query.edit_message_text("⏳ Проверяю возможность ручного запуска резервного копирования...")
+    
+    success, message = start_manual_backup()
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("◀️ Назад к статусу", callback_data="refresh_backup_status")]
+    ]
+    
+    if success:
+        keyboard.insert(0, [telegram.InlineKeyboardButton("⚠️ ВНИМАНИЕ: Подтвердить запуск", callback_data="confirm_manual_backup")])
+    
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    if success:
+        final_message = f"✅ {message}\n\n⚠️ ВНИМАНИЕ: Ручное резервное копирование может занять длительное время и повлиять на производительность сервера!"
+    else:
+        final_message = f"❌ {message}"
+    
+    query.edit_message_text(final_message, reply_markup=reply_markup)
+
+def handle_confirm_manual_backup(update: telegram.Update, context: CallbackContext):
+    """Подтверждение ручного запуска резервного копирования"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer()
+    
+    # В производственной среде здесь можно добавить реальный запуск резервного копирования
+    # Пока просто информируем пользователя
+    message = ("⚠️ Функция ручного запуска резервного копирования отключена в целях безопасности.\n\n"
+               "Для запуска резервного копирования:\n"
+               "1. Подключитесь к серверу через RDP\n"
+               "2. Откройте Windows Server Backup\n"
+               "3. Выберите 'Архивировать однократно'\n\n"
+               "Или обратитесь к системному администратору.")
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("◀️ Назад к статусу", callback_data="refresh_backup_status")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    query.edit_message_text(message, reply_markup=reply_markup)
+
+def handle_backup_details(update: telegram.Update, context: CallbackContext):
+    """Показывает детальную информацию о резервных копиях"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer("📋 Получаю детальную информацию...")
+    
+    # Получаем подробную информацию
+    versions_info = get_backup_versions()
+    disk_info = check_backup_disk_space()
+    
+    detailed_info = f"📋 Детальная информация о резервных копиях:\n\n{versions_info}\n\n{disk_info}"
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить", callback_data="backup_details")],
+        [telegram.InlineKeyboardButton("◀️ Назад к статусу", callback_data="refresh_backup_status")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    query.edit_message_text(detailed_info, reply_markup=reply_markup)
+
+def handle_refresh_backup_versions(update: telegram.Update, context: CallbackContext):
+    """Обновляет список версий резервных копий"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer("🔄 Обновляю список...")
+    
+    versions_info = get_backup_versions()
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить список", callback_data="refresh_backup_versions")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    query.edit_message_text(versions_info, reply_markup=reply_markup)
+
+def handle_refresh_disk_space(update: telegram.Update, context: CallbackContext):
+    """Обновляет информацию о месте на дисках"""
+    if not is_authorized(update):
+        update.callback_query.answer("У вас нет доступа.", show_alert=True)
+        return
+        
+    query = update.callback_query
+    query.answer("🔄 Обновляю информацию...")
+    
+    disk_info = check_backup_disk_space()
+    
+    keyboard = [
+        [telegram.InlineKeyboardButton("🔄 Обновить информацию", callback_data="refresh_disk_space")]
+    ]
+    reply_markup = telegram.InlineKeyboardMarkup(keyboard)
+    
+    query.edit_message_text(disk_info, reply_markup=reply_markup)
+
+# ============== ОСТАЛЬНЫЕ ФУНКЦИИ (ОРИГИНАЛЬНЫЕ) ==============
 
 def show_user_management_menu(update: telegram.Update, context: CallbackContext):
     """Показывает меню управления пользователями"""
@@ -609,6 +807,11 @@ def main():
     dp.add_handler(CallbackQueryHandler(handle_vpn_menu, pattern=r'^vpn_menu_'))
     dp.add_handler(CallbackQueryHandler(handle_back_to_vpn, pattern=r'^back_to_vpn'))
     dp.add_handler(CallbackQueryHandler(handle_refresh_vpn, pattern=r'^refresh_vpn'))
+    # НОВЫЕ обработчики для резервного копирования (убрали manual_backup)
+    dp.add_handler(CallbackQueryHandler(handle_refresh_backup_status, pattern=r'^refresh_backup_status'))
+    dp.add_handler(CallbackQueryHandler(handle_backup_details, pattern=r'^backup_details'))
+    dp.add_handler(CallbackQueryHandler(handle_refresh_backup_versions, pattern=r'^refresh_backup_versions'))
+    dp.add_handler(CallbackQueryHandler(handle_refresh_disk_space, pattern=r'^refresh_disk_space'))
 
     updater.start_polling()
     updater.idle()

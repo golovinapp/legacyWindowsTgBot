@@ -68,7 +68,6 @@ def start(update: telegram.Update, context: CallbackContext):
         [telegram.KeyboardButton("Управление пользователями")],
         [telegram.KeyboardButton("Управление сервером")],
         [telegram.KeyboardButton("VPN соединения")],
-        [telegram.KeyboardButton("Загрузка сервера")],
         [telegram.KeyboardButton("Проверка связи")],
         [telegram.KeyboardButton("Резервные копии")]
     ]
@@ -81,7 +80,7 @@ def handle_message(update: telegram.Update, context: CallbackContext):
         return
 
     text = update.message.text
-    if text == "Загрузка сервера":
+    if text == "Состояние сервера":
         show_server_load(update, context)
     elif text == "VPN соединения":
         show_vpn_sessions(update, context)
@@ -615,6 +614,7 @@ def handle_reset_vpn(update: telegram.Update, context: CallbackContext):
 
 def show_server_control_menu(update: telegram.Update, context: CallbackContext):
     keyboard = [
+        [telegram.KeyboardButton("Состояние сервера")],
         [telegram.KeyboardButton("Перезагрузка сервера")],
         [telegram.KeyboardButton("Перезапуск VPN")],
         [telegram.KeyboardButton("Назад")]

@@ -1,15 +1,16 @@
 import subprocess
 import chardet
 import re
+from backup_monitoring import _get_backup_schedule
 
 def get_server_load():
     """
     Расширенная функция, которая:
       1) Получает загрузку CPU, память и информацию по дискам.
       2) Проверяет статус служб "1C:Enterprise 8.2 Server Agent" и "1C:Enterprise 8.3 Server Agent".
-      3) Получает время загрузки системы.
-      4) Формирует общий текстовый отчёт.
-         (Теперь время загрузки в последней строке, а статус служб 1С помечается эмоджи)
+      3) Получает расписание резервного копирования.
+      4) Получает время загрузки системы.
+      5) Формирует общий текстовый отчёт о состоянии сервера.
     """
     try:
         # 1. Получаем загрузку CPU
@@ -31,10 +32,13 @@ def get_server_load():
 
         # 5. Получаем время загрузки системы
         boot_time_str = _get_boot_time()
+        
+        # 6. Получаем расписание резервного копирования
+        backup_schedule = _get_backup_schedule()
 
         # Формируем финальный вывод
         lines = []
-        lines.append("Загрузка сервера:")
+        lines.append("Состояние сервера:")
         lines.append(f"- CPU: {cpu_load}% {cpu_emoji}")
         lines.append(f"- Память: {mem_usage_str} {mem_emoji}")
 
@@ -44,6 +48,9 @@ def get_server_load():
         # Добавляем строки о статусах служб 1С
         lines.append(f"- Служба 1С 8.2: {service_82_status} {service_82_emoji}")
         lines.append(f"- Служба 1С 8.3: {service_83_status} {service_83_emoji}")
+        
+        # Добавляем расписание резервного копирования
+        lines.append(f"- Резервное копирование: {backup_schedule}")
 
         # Время загрузки — последняя строка
         lines.append(f"- Время загрузки системы: {boot_time_str}")

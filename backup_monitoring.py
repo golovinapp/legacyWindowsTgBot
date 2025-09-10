@@ -192,17 +192,23 @@ def _get_last_backup_info():
                         continue
         
         if latest_date:
-            time_diff = datetime.now() - latest_date
+            now = datetime.now()
             status_indicator = latest_status if latest_status else ""
             
-            if time_diff.days == 0:
+            # Сравниваем только даты (без времени)
+            today = now.date()
+            backup_date = latest_date.date()
+            
+            if backup_date == today:
                 return f"🟢 Сегодня в {latest_time} {status_indicator}".strip()
-            elif time_diff.days == 1:
+            elif (today - backup_date).days == 1:
                 return f"🟡 Вчера в {latest_time} {status_indicator}".strip()
-            elif time_diff.days <= 7:
-                return f"🟡 {time_diff.days} дней назад ({latest_date.strftime('%d.%m.%Y')}) {status_indicator}".strip()
+            elif (today - backup_date).days <= 7:
+                days_ago = (today - backup_date).days
+                return f"🟡 {days_ago} дней назад ({latest_date.strftime('%d.%m.%Y')}) {status_indicator}".strip()
             else:
-                return f"🔴 {time_diff.days} дней назад ({latest_date.strftime('%d.%m.%Y')}) {status_indicator}".strip()
+                days_ago = (today - backup_date).days
+                return f"🔴 {days_ago} дней назад ({latest_date.strftime('%d.%m.%Y')}) {status_indicator}".strip()
         
         return "⚠️ Информация недоступна"
         

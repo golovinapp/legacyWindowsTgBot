@@ -67,12 +67,10 @@ def start(update: telegram.Update, context: CallbackContext):
     keyboard = [
         [telegram.KeyboardButton("Управление пользователями")],
         [telegram.KeyboardButton("Управление сервером")],
-        [telegram.KeyboardButton("VPN соединения")],
-        [telegram.KeyboardButton("Проверка связи")],
-        [telegram.KeyboardButton("Резервные копии")]
+        [telegram.KeyboardButton("VPN соединения")]
     ]
     reply_markup = telegram.ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
-    update.message.reply_text("Привет! Я помогу управлять сеансами, мониторить сервер, VPN и резервные копии. Выбери действие:", reply_markup=reply_markup)
+    update.message.reply_text("Привет! Я помогу управлять пользователями, сервером и VPN. Выбери действие:", reply_markup=reply_markup)
 
 def handle_message(update: telegram.Update, context: CallbackContext):
     if not is_authorized(update):
@@ -615,6 +613,8 @@ def handle_reset_vpn(update: telegram.Update, context: CallbackContext):
 def show_server_control_menu(update: telegram.Update, context: CallbackContext):
     keyboard = [
         [telegram.KeyboardButton("Состояние сервера")],
+        [telegram.KeyboardButton("Проверка связи")],
+        [telegram.KeyboardButton("Резервные копии")],
         [telegram.KeyboardButton("Перезагрузка сервера")],
         [telegram.KeyboardButton("Перезапуск VPN")],
         [telegram.KeyboardButton("Назад")]
